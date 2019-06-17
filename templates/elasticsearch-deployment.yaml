@@ -1,0 +1,119 @@
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  labels:
+    app: elasticsearch
+    component: elasticsearch
+    release: {{ .Release.Name }}
+  name: elasticsearch
+spec:
+  podManagementPolicy: Parallel
+  replicas: 1
+  revisionHistoryLimit: 10
+  selector:
+    matchLabels:
+      app: elasticsearch
+      component: elasticsearch
+      release: {{ .Release.Name }}
+  serviceName: elasticsearch
+  template:
+    metadata:
+      creationTimestamp: null
+      labels:
+        app: elasticsearch
+        component: elasticsearch
+        release: {{ .Release.Name }}
+    spec:
+      containers:
+      - env:
+        - name: discovery.type
+          value: single-node
+        - name: bootstrap.memory_lock
+          value: "false"
+        - name: ES_JAVA_OPTS
+          value: -Xms512m -Xmx512m
+        - name: http.host
+          value: 0.0.0.0
+        - name: network.host
+          value: 0.0.0.0
+        - name: transport.host
+          value: localhost
+        image: elasticsearch:6.5.0
+        imagePullPolicy: IfNotPresent
+        name: elasticsearch
+        ports:
+        - containerPort: 9200
+          name: http
+          protocol: TCP
+        - containerPort: 9300
+          name: transport
+          protocol: TCP
+        resources:
+          limits:
+            cpu: 250m
+            memory: 1Gi
+          requests:
+            cpu: 150m
+            memory: 512Mi
+        securityContext:
+          privileged: true
+          runAsUser: 1000
+        terminationMessagePath: /dev/termination-log
+        terminationMessagePolicy: File
+        volumeMounts:
+        - mountPath: /usr/share/elasticsearch/data
+          name: elasticsearch-persistent-data
+      dnsPolicy: ClusterFirst
+      initContainers:
+      - command:
+        - sh
+        - -c
+        - chown -R 1000:1000 /usr/share/elasticsearch/data
+        - sysctl -w vm.max_map_count=262144
+        - chmod 777 /usr/share/elasticsearch/data
+        - chomod 777 /usr/share/elasticsearch/data/node
+        - chmod g+rwx /usr/share/elasticsearch/data
+        - chgrp 1000 /usr/share/elasticsearch/data
+        image: busybox:1.29.2
+        imagePullPolicy: IfNotPresent
+        name: set-dir-owner
+        resources: {}
+        securityContext:
+          privileged: true
+        terminationMessagePath: /dev/termination-log
+        terminationMessagePolicy: File
+        volumeMounts:
+        - mountPath: /usr/share/elasticsearch/data
+          name: elasticsearch-persistent-data
+      restartPolicy: Always
+      schedulerName: default-scheduler
+      securityContext: {}
+      terminationGracePeriodSeconds: 10
+  updateStrategy:
+    type: OnDelete
+  volumeClaimTemplates:
+  - metadata:
+      creationTimestamp: null
+      name: elasticsearch-persistent-data
+    spec:
+      accessModes:
+      - ReadWriteOnce
+      resources:
+        requests:
+          storage: 10Gi
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: elasticsearch
+  labels:
+    app: elasticsearch
+    release: {{ .Release.Name }}
+spec:
+  ports:
+  - name: elasticsearch
+    port: 9200
+    targetPort: 9200
+  selector:
+    app: elasticsearch
+    release: {{ .Release.Name }}

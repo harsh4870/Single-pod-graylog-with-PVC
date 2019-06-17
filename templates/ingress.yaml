@@ -1,0 +1,17 @@
+apiVersion: extensions/v1beta1
+kind: Ingress
+metadata:
+  name: graylog
+  labels:
+    app: graylog
+    release: {{ .Release.Name }}
+  annotations:
+    kubernetes.io/ingress.class: nginx
+spec:
+  rules:
+    - host: {{ .Values.graylog.host }}
+      http:
+        paths:
+          - backend:
+              serviceName: graylog
+              servicePort: 9000
